@@ -2,33 +2,65 @@
 
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { ValidateService } from './validate.service';
-import { JwtVerifiedReply } from './validate.type';
+import { JwtReply } from './validate.type';
 
 const validateService = new ValidateService();
 
-export async function validateHandler(req: FastifyRequest, reply: JwtVerifiedReply) {
+export async function validateHandler(req: FastifyRequest, reply: JwtReply) {
   
+ 
+
   const authHeader = req.headers.authorization;
-  
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    
     return reply.code(401).send({ message: 'Header Authorization inválido.' });
   }
 
-  
   const credentialString = authHeader.replace('Bearer ', '');
+
+  
 
   try {
     
-    const { userId } = await validateService.validateCredential(credentialString, reply);
+    
+    try {
+      
+      
+      const payload: any = await req.jwtVerify();
+      
+      
+      
+      reply.header('X-User-ID', payload.userId); 
+      return reply.code(200).send({ message: 'Credencial JWT válida.' });
 
-   
-    reply.header('X-User-ID', userId); 
+    } catch (jwtError: any) {
+     
+      req.log.warn({
+        errName: jwtError.name,       
+        errMessage: jwtError.message  
+      }, 'validateHandler: FALHA no JWT. Verificando como API Key...');
+      
+    }
+
     
     
-    return reply.code(200).send({ message: 'Credencial válida.' });
+    req.log.info('validateHandler: Tentativa 2 -> Verificando como API Key...');
+    const apiKeyResult = await validateService.findUserByApiKey(credentialString);
+
+    if (apiKeyResult) {
+      
+     
+      
+      reply.header('X-User-ID', apiKeyResult.userId);
+      return reply.code(200).send({ message: 'Credencial ApiKey válida.' });
+    }
+
     
+ 
+  
+    return reply.code(401).send({ message: 'Não Autorizado: Credencial inválida.' });
+
   } catch (e: any) {
-    
-    return reply.code(401).send({ message: e.message || 'Não Autorizado.' });
+    return reply.code(500).send({ message: 'Erro interno do servidor' });
   }
 }

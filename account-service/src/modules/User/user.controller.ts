@@ -31,6 +31,10 @@ export async function loginHandler(
 ) {
   try {
     
+
+    req.log.info({env: process.env.JWT_SECRET}, 'JWT SECRET NO HANDLER DE LOGIN');
+
+
     const user = await userService.loginUser(req.body);
 
     

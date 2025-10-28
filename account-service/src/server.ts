@@ -6,6 +6,7 @@ import jwtAuthPlugin from './plugins/auth.js';
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import userRoutes from './modules/User/user.routes.js';
 import apiKeyRoutes from './modules/ApiKey/apkey.routes';
+import validateRoutes from './modules/Validate/validate.route.js';
 
 
 const app = Fastify({
@@ -26,7 +27,8 @@ async function main() {
     await app.register(jwtAuthPlugin)
 
     await app.register(userRoutes, { prefix: '/api/auth' });
-    await app.register(apiKeyRoutes, { prefix: '/api/auth/apikeys' });
+    await app.register(apiKeyRoutes, { prefix: '/api/keys' });
+    await app.register(validateRoutes, { prefix: '/internal/auth' });
     
 
     
