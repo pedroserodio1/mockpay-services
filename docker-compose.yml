@@ -1,0 +1,35 @@
+services:
+  account-db:
+    image: mongo:6.0
+    container_name: mockpay-account-db
+    ports:
+      - "27017:27017"
+    volumes:
+      - account-db-data:/data/db
+    environment:
+      # Lê as variáveis do arquivo .env
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASS}
+      
+  account-db-admin:
+    image: mongo-express
+    container_name: mockpay-account-db-admin
+    restart: unless-stopped
+    ports:
+      - "8081:8081"  
+    depends_on:
+      - account-db
+    environment:
+      # Lê as variáveis do arquivo .env
+      ME_CONFIG_BASICAUTH_USERNAME: ${ADMIN_USER}
+      ME_CONFIG_BASICAUTH_PASSWORD: ${ADMIN_PASS}
+      
+      ME_CONFIG_MONGODB_SERVER: account-db
+      
+      ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_USER}
+      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_PASS}
+      ME_CONFIG_MONGODB_ENABLE_ADMIN: "true"
+
+volumes:
+  account-db-data:
+    driver: local
