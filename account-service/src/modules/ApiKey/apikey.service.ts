@@ -33,4 +33,15 @@ export class ApiKeyService {
       throw new Error("Erro ao listar api keys");
     }
   }
+
+  async deleteApiKey(apiKeyId: string, userId: string) {
+    try {
+      const result = await ApiKeyModel.deleteOne({ _id: apiKeyId, userId });
+      if (result.deletedCount === 0) {
+        throw new Error("API Key não encontrada ou não pertence ao usuário");
+      }
+    } catch (err: any) {
+      throw new Error("Erro ao deletar api key");
+    }
+  }
 }

@@ -1,6 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { verifyJWT } from "../User/user.middleware";
-import { createApiKeyHandler, listApiKeysHandler } from "./apikey.controller";
+import { createApiKeyHandler, deleteApiKeyHandler, listApiKeysHandler } from "./apikey.controller";
 
 async function apiKeyRoutes(app: FastifyInstance) {
     app.get("/", {
@@ -12,6 +12,11 @@ async function apiKeyRoutes(app: FastifyInstance) {
         preHandler: [verifyJWT],
         handler: createApiKeyHandler
     })
+
+    app.delete("/:id", {
+        preHandler: [verifyJWT],
+        handler: deleteApiKeyHandler
+    });
 }
 
 export default apiKeyRoutes;

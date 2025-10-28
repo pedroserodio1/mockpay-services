@@ -21,3 +21,14 @@ export async function listApiKeysHandler(request: any, reply: any) {
     return reply.code(400).send({ message: e.message });
   }
 }
+
+export async function deleteApiKeyHandler(request: any, reply: any) {
+    try {
+        const userId = request.user.id;
+        const apiKeyId = request.params.id;
+        await apiKeyService.deleteApiKey(apiKeyId, userId);
+        return reply.code(204).send();
+    } catch (e: any) {
+        return reply.code(400).send({ message: e.message });
+    }
+}
