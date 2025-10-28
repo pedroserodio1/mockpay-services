@@ -1,10 +1,10 @@
 
 import Fastify from 'fastify';
-import mongoosePlugin from '@/plugins/db.js';
+import mongoosePlugin from './plugins/db.js';
 import 'dotenv/config';
-import jwtAuthPlugin from '@/plugins/auth.js';
+import jwtAuthPlugin from './plugins/auth.js';
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
-import userRoutes from '@/modules/User/user.routes.js';
+import userRoutes from './modules/User/user.routes.js';
 import apiKeyRoutes from './modules/ApiKey/apkey.routes';
 
 
