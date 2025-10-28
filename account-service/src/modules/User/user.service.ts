@@ -1,7 +1,6 @@
 import { UserModel } from "./user.model";
 import { RegisterUserInput, LoginUserInput } from "./user.schema";
-import { FastifyReply } from "fastify";
-import { FastifyJWT } from "@fastify/jwt";
+
 
 export class UserService {
   async registerUser(input: RegisterUserInput) {

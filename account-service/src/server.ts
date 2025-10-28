@@ -5,6 +5,7 @@ import 'dotenv/config';
 import jwtAuthPlugin from '@/plugins/auth.js';
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import userRoutes from '@/modules/User/user.routes.js';
+import apiKeyRoutes from './modules/ApiKey/apkey.routes';
 
 
 const app = Fastify({
@@ -25,6 +26,7 @@ async function main() {
     await app.register(jwtAuthPlugin)
 
     await app.register(userRoutes, { prefix: '/api/auth' });
+    await app.register(apiKeyRoutes, { prefix: '/api/auth/apikeys' });
     
 
     

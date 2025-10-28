@@ -33,7 +33,6 @@ const userSchema = new Schema<IUser>({
 
 userSchema.pre('save', async function (next) {
   
-  
   if (!this.isModified('passwordHash')) {
     return next();
   }
@@ -54,8 +53,7 @@ userSchema.pre('save', async function (next) {
 
 
 userSchema.methods.comparePassword = function (password: string): Promise<boolean> {
-  // 'password' = a senha que o usuário digitou no login (ex: "123456")
-  // 'this.passwordHash' = o hash salvo no banco (ex: "$2a$10$...")
+
   return bcrypt.compare(password, this.passwordHash);
 };
 
