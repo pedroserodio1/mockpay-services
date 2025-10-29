@@ -1,3 +1,17 @@
 **/.env
 **/node_modules
 **/dist
+
+**/bin
+**/obj
+*.log
+
+*.user
+*.suo
+
+*.nupkg
+
+*.log
+*.tmp
+
+appsettings.Development.json

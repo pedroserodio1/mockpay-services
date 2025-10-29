@@ -1,5 +1,4 @@
 services:
-
   gateway:
     build: ./gateway-nginx 
     container_name: mockpay_gateway
@@ -7,6 +6,7 @@ services:
       - "8080:80"
     depends_on:
       - account-service
+      - payment-service
 
   account-service:
     build: ./account-service
@@ -17,6 +17,15 @@ services:
       - MONGO_URL=mongodb://${MONGO_USER}:${MONGO_PASS}@account-db:27017/account_db?authSource=admin
       - JWT_SECRET=${JWT_SECRET} 
       - PORT=8081 
+  payment-service:
+    build:
+      context: ./payment-service/PaymentService 
+    container_name: mockpay_payment_service
+    depends_on:
+      - payment-db 
+    environment:
+      - ConnectionStrings__DefaultConnection=Host=payment-db;Port=5432;Database=payment_db;Username=${POSTGRES_USER};Password=${POSTGRES_PASS}
+      - ASPNETCORE_URLS=http://+:8082
   account-db:
     image: mongo:6.0
     container_name: mockpay-account-db
@@ -45,7 +54,22 @@ services:
       ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_USER}
       ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_PASS}
       ME_CONFIG_MONGODB_ENABLE_ADMIN: "true"
+  
+  payment-db:
+    image: postgres:15-alpine
+    container_name: mockpay_payment_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - payment-db-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASS}
+      - POSTGRES_DB=payment_db
+    restart: unless-stopped
 
 volumes:
   account-db-data:
+    driver: local
+  payment-db-data:
     driver: local
