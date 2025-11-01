@@ -24,6 +24,7 @@ services:
     depends_on:
       - payment-db
       - rabbit-mq
+      - queue-setup
     environment:
       - ConnectionStrings__DefaultConnection=Host=payment-db;Port=5432;Database=payment_db;Username=${POSTGRES_USER};Password=${POSTGRES_PASS}
       - ASPNETCORE_URLS=http://+:8082
@@ -31,19 +32,54 @@ services:
       - RABBITMQ_PASS=${RABBIT_PASS}
       - RABBITMQ_HOST=rabbit-mq
 
-  rabbit-mq:
+  webhook-service:
     build:
-      context: ./rabbitmq-custom
+      context: ./webhook-service
+    container_name: mockpay_webhook_service
+    ports:
+      - "8083:8083" 
+    depends_on:
+      - rabbit-mq
+      - webhook-db
+      - queue-setup
+    environment:
+      - MONGO_URI=mongodb://${MONGO_WEBHOOK_USER}:${MONGO_WEBHOOK_PASS}@webhook-db:27017/webhook_db?authSource=admin
+      
+      - RABBIT_USER=${RABBIT_USER}
+      - RABBIT_PASS=${RABBIT_PASS}
+      - RABBITMQ_HOST=rabbit-mq 
+      - PORT=8083
+    restart: unless-stopped
+
+  rabbit-mq:
+    image: rabbitmq:3.13-management-alpine
     container_name: mockpay_rabbit
     ports:
       - "5672:5672"
       - "15672:15672"
+    volumes:
+      - rabbit-mq-data:/var/lib/rabbitmq/
     environment:
       - RABBITMQ_DEFAULT_USER=${RABBIT_USER}
       - RABBITMQ_DEFAULT_PASS=${RABBIT_PASS}
-    volumes:
-      - rabbit-mq-data:/var/lib/rabbitmq/
     restart: unless-stopped
+    command: >
+      sh -c "
+        rabbitmq-plugins enable --offline rabbitmq_management &&
+        wget -O /plugins/rabbitmq_delayed_message_exchange.ez https://github.com/rabbitmq/rabbitmq-delayed-message-exchange/releases/download/v3.13.0/rabbitmq_delayed_message_exchange-3.13.0.ez &&
+        rabbitmq-plugins enable --offline rabbitmq_delayed_message_exchange &&
+        rabbitmq-server
+      "
+  queue-setup:
+    build:
+      context: ./rabbitmq-setup
+    depends_on:
+      - rabbit-mq
+    environment:
+      - RABBIT_USER=${RABBIT_USER}
+      - RABBIT_PASS=${RABBIT_PASS}
+      - RABBITMQ_HOST=rabbit-mq 
+
   account-db:
     image: mongo:6.0
     container_name: mockpay-account-db
@@ -86,10 +122,44 @@ services:
       - POSTGRES_DB=payment_db
     restart: unless-stopped
 
+  webhook-db:
+    image: mongo:6.0
+    container_name: mockpay_webhook_db
+    ports: 
+      - "27018:27017"
+    volumes:
+      - webhook-db-data:/data/db_webhook
+    environment:
+      # Usa as novas credenciais do .env
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_WEBHOOK_USER} 
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_WEBHOOK_PASS}
+      # O nome da base de dados
+      - MONGO_INITDB_DATABASE=webhook_db
+    restart: unless-stopped
+  webhook-db-admin:
+    image: mongo-express
+    container_name: mockpay-webhook-db-admin
+    restart: unless-stopped
+    ports:
+      - "8089:8081"
+    depends_on:
+      - webhook-db
+    environment:
+      ME_CONFIG_BASICAUTH_USERNAME: ${ADMIN_USER}
+      ME_CONFIG_BASICAUTH_PASSWORD: ${ADMIN_PASS}
+
+      ME_CONFIG_MONGODB_SERVER: webhook-db
+
+      ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_WEBHOOK_USER}
+      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_WEBHOOK_PASS}
+      ME_CONFIG_MONGODB_ENABLE_ADMIN: "true"
+
 volumes:
   account-db-data:
     driver: local
   payment-db-data:
     driver: local
   rabbit-mq-data:
+    driver: local
+  webhook-db-data:
     driver: local

@@ -16,22 +16,36 @@ public class PaymentsController : ControllerBase
 
     [HttpPost("update-status")]
     public async Task<IActionResult> UpdateStatus([FromBody] UpdatePaymentStatusRequest request)
+{
+    try
     {
-        
-        try
+        // 🔹 Log inicial para debug
+        Console.WriteLine("===============================================");
+        Console.WriteLine("[UpdateStatus] Request recebida no endpoint /internal/update-status");
+        if (request != null)
         {
-            await _paymentService.UpdateStatusInternalAsync(request);
-            
-            return Ok(new { Message = $"Status do TxId {request.TxId} atualizado para {request.Action}." });
+            Console.WriteLine($"[UpdateStatus] TxId: {request.TxId}");
+            Console.WriteLine($"[UpdateStatus] Action: {request.Action}");
         }
-        catch (KeyNotFoundException ex)
+        else
         {
-            return NotFound(new { Message = ex.Message }); 
+            Console.WriteLine("[UpdateStatus] Request é null!");
         }
-        catch (Exception ex)
-        {
+        Console.WriteLine("===============================================");
 
-            return BadRequest(new { Message = ex.Message }); 
-        }
+        await _paymentService.UpdateStatusInternalAsync(request);
+        
+        return Ok(new { Message = $"Status do TxId {request.TxId} atualizado para {request.Action}." });
     }
+    catch (KeyNotFoundException ex)
+    {
+        Console.WriteLine($"[UpdateStatus][NotFound] {ex.Message}");
+        return NotFound(new { Message = ex.Message }); 
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[UpdateStatus][BadRequest] {ex.Message}");
+        return BadRequest(new { Message = ex.Message }); 
+    }
+}
 }

@@ -64,8 +64,13 @@ public class PaymentServices(AppDbContext dbContext, RabbitMQPublisher rabbitMQ)
             case "credit_card":
                 if (paymentDTO.Card == null)
                 {
+                    // LOG 1: Erro de validação
+                    Console.WriteLine($"[LOG-CRITICO] Erro de validação: Dados do cartão ausentes para TxId {payment.TxId}.");
                     throw new KeyNotFoundException("Dados do cartão são obrigatórios.");
                 }
+
+                // LOG 2: Confirma que o processamento de cartão foi iniciado
+                Console.WriteLine($"[LOG-INFO] Processamento de Cartão de Crédito iniciado. TxId: {payment.TxId}, User: {ownerUserId}.");
 
                 payment.PaymentHistory.Add(new Domains.PaymentStory
                 {
@@ -75,11 +80,18 @@ public class PaymentServices(AppDbContext dbContext, RabbitMQPublisher rabbitMQ)
                 });
 
                 var random = new Random();
-                // Atraso entre 5 segundos (min) e 30 segundos (max)
                 int randomDelaySeconds = random.Next(5, 30);
                 TimeSpan delayCredit = TimeSpan.FromSeconds(randomDelaySeconds);
 
-                await _rabbitPublisher.PublishDelayedApproval(payment.TxId, delayCredit);
+                long delayMs = Math.Max(0, (long)delayCredit.TotalMilliseconds);
+
+                // LOG 3: Mostrar o delay calculado
+                Console.WriteLine($"[LOG-DELAY] Calculado delay de {randomDelaySeconds} segundos para aprovação de cartão.");
+
+                // LOG 4: A chamada para o publisher
+                await _rabbitPublisher.PublishDelayedApproval(payment.TxId, delayMs);
+                Console.WriteLine($"[LOG-RABBIT] Chamada BEM-SUCEDIDA ao PublishDelayedApproval para TxId: {payment.TxId}.");
+
                 break;
             default:
                 throw new KeyNotFoundException("Metodo de pagamento não registrado");
@@ -140,7 +152,7 @@ public class PaymentServices(AppDbContext dbContext, RabbitMQPublisher rabbitMQ)
 
     public async Task UpdateStatusInternalAsync(UpdatePaymentStatusRequest request)
     {
-        
+
         var payment = await _dbContext.Payments
             .SingleOrDefaultAsync(p => p.TxId == request.TxId);
 

@@ -1,0 +1,29 @@
+{
+  "name": "webhook-service",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "bun run src/main.ts",
+    "dev": "bun --hot run src/main.ts"
+  },
+  "devDependencies": {
+    "@types/amqplib": "^0.10.8",
+    "@types/axios": "^0.14.4",
+    "@types/bun": "latest",
+    "@types/express": "^5.0.5",
+    "@types/mongoose": "^5.11.97",
+    "@types/node": "^24.9.2",
+    "pino-pretty": "^13.1.2"
+  },
+  "peerDependencies": {
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "amqplib": "^0.10.9",
+    "axios": "^1.13.1",
+    "express": "^5.1.0",
+    "mongoose": "^8.19.2",
+    "pino": "^10.1.0"
+  }
+}
