@@ -9,6 +9,13 @@ using PaymentService.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+var rabbitUser = builder.Configuration["RABBITMQ_USER"];
+var rabbitPass = builder.Configuration["RABBITMQ_PASS"];
+
+// 1. Adicione um log de console
+Console.WriteLine($"[DEBUG] Config: RABBITMQ_USER lido como: {rabbitUser}");
+Console.WriteLine($"[DEBUG] Config: RABBITMQ_PASS lido como: {rabbitPass}");    
+
 
 /* This code snippet is configuring the JSON serialization options for the controllers in the
 application. */
@@ -25,48 +32,51 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 );
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c => // "c" são as opções
+builder.Services.AddSwaggerGen(c => 
 {
-    // 1. (Opcional) Define o título do seu Swagger
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "MockPay - PaymentService", Version = "v1" });
 
-    // 2. DEFINE O "BOTÃO AUTHORIZE" (Security Definition)
-    //    Estamos a dizer ao Swagger que usamos o padrão "Bearer".
+    
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Name = "Authorization",
         Description = "Autenticação via API Key (JWT ou mockpk_...).\n\n" +
                       "**Não** precisa de escrever 'Bearer'.\n" +
                       "**Insira apenas a sua chave/token abaixo.**",
-        In = ParameterLocation.Header, // A chave vai no Header
-        Type = SecuritySchemeType.Http, // O tipo é HTTP
-        Scheme = "bearer", // O esquema é 'bearer' (isto faz o Swagger adicionar "Bearer " automaticamente)
+        In = ParameterLocation.Header, 
+        Type = SecuritySchemeType.Http, 
+        Scheme = "bearer", 
         BearerFormat = "JWT/ApiKey"
     });
 
-    // 3. APLICA A SEGURANÇA (Security Requirement)
-    //    Isto diz ao Swagger para adicionar o ícone de "cadeado"
-    //    e usar a definição "Bearer" em todas as chamadas.
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
             new OpenApiSecurityScheme
             {
-                // A referência ao esquema que definimos acima
                 Reference = new OpenApiReference
                 {
                     Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer" // <-- O ID tem de ser igual ao nome "Bearer"
+                    Id = "Bearer" 
                 }
             },
-            new string[] {} // Não precisamos de escopos (scopes)
+            new string[] {} 
         }
     });
 });
 
 builder.Services.AddServices();
 
-builder.Services.AddHostedService<ExpirationWorker>();
+
+builder.Configuration.AddInMemoryCollection(new[]
+{
+    new KeyValuePair<string, string>("RabbitMQ:HostName", "rabbit-mq"),
+    new KeyValuePair<string, string>("RabbitMQ:UserName", builder.Configuration["RABBITMQ_USER"]),
+    new KeyValuePair<string, string>("RabbitMQ:Password", builder.Configuration["RABBITMQ_PASS"]) 
+});
+
+builder.Services.AddSingleton<RabbitMQPublisher>();
+builder.Services.AddHostedService(provider => provider.GetRequiredService<RabbitMQPublisher>());
 
 var app = builder.Build();
 

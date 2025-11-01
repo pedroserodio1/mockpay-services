@@ -7,9 +7,10 @@ using PaymentService.Models;
 
 namespace PaymentService.Services;
 
-public class PaymentServices(AppDbContext dbContext)
+public class PaymentServices(AppDbContext dbContext, RabbitMQPublisher rabbitMQ)
 {
     private readonly AppDbContext _dbContext = dbContext;
+    private readonly RabbitMQPublisher _rabbitPublisher = rabbitMQ;
 
     public async Task<Payment?> GetPaymentByIdAsync(string id, string userId)
     {
@@ -43,7 +44,7 @@ public class PaymentServices(AppDbContext dbContext)
             case "boleto":
                 payment.Status = PaymentStatus.PENDING;
                 payment.ExpiresAt = (paymentDTO.Method == "pix")
-                    ? DateTime.UtcNow.AddMinutes(30)
+                    ? DateTime.UtcNow.AddMinutes(2)
                     : DateTime.UtcNow.AddDays(3);
                 payment.PaymentHistory.Add(new Domains.PaymentStory
                 {
@@ -51,6 +52,14 @@ public class PaymentServices(AppDbContext dbContext)
                     Description = $"O pagamento {txId} do usuario {ownerUserId} foi criado.",
                     Timestamp = DateTime.UtcNow
                 });
+
+                TimeSpan delay = payment.ExpiresAt.Value - DateTime.UtcNow;
+
+                if (delay.TotalMilliseconds > 0)
+                {
+                    await _rabbitPublisher.PublishExpirationCheck(payment.TxId, delay);
+                }
+
                 break;
             case "credit_card":
                 if (paymentDTO.Card == null)
@@ -65,19 +74,12 @@ public class PaymentServices(AppDbContext dbContext)
                     Timestamp = DateTime.UtcNow
                 });
 
-                string simulationStatus = SimulateCardAuthorization(paymentDTO.Card);
+                var random = new Random();
+                // Atraso entre 5 segundos (min) e 30 segundos (max)
+                int randomDelaySeconds = random.Next(5, 30);
+                TimeSpan delayCredit = TimeSpan.FromSeconds(randomDelaySeconds);
 
-                string statusCard = simulationStatus;
-
-                payment.Status = (statusCard == "APPROVED") ? PaymentStatus.PAID : PaymentStatus.FAILED;
-                payment.PaidAt = DateTime.UtcNow;
-                payment.PaymentHistory.Add(new Domains.PaymentStory
-                {
-                    Status = payment.Status.ToString(),
-                    Description = $"O pagamento {txId} do usuario {ownerUserId} foi {payment.Status.ToString()}.",
-                    Timestamp = DateTime.UtcNow,
-                    Reason = statusCard
-                });
+                await _rabbitPublisher.PublishDelayedApproval(payment.TxId, delayCredit);
                 break;
             default:
                 throw new KeyNotFoundException("Metodo de pagamento não registrado");
@@ -131,18 +133,60 @@ public class PaymentServices(AppDbContext dbContext)
 
         await _dbContext.SaveChangesAsync();
 
+        await _rabbitPublisher.PublishPaymentApproved(payment);
+
         return true;
     }
 
-    private string SimulateCardAuthorization(CardDetailsDTO card)
-{
-    // Lógica de simulação "de brincadeira":
-    // Se o cartão terminar em 1111, aprova.
-    // Se terminar em 4444, recusa por saldo.
-    if (card.Number.EndsWith("1111")) return "APPROVED";
-    if (card.Number.EndsWith("4444")) return "DECLINED_INSUFFICIENT_FUNDS";
-    
-    // Padrão
-    return "DECLINED";
-}
+    public async Task UpdateStatusInternalAsync(UpdatePaymentStatusRequest request)
+    {
+        
+        var payment = await _dbContext.Payments
+            .SingleOrDefaultAsync(p => p.TxId == request.TxId);
+
+        if (payment == null)
+        {
+            throw new KeyNotFoundException($"TxId '{request.TxId}' não encontrado para atualização de status.");
+        }
+
+        PaymentStatus currentStatus = payment.Status;
+
+        switch (request.Action)
+        {
+            case PaymentStatus.EXPIRED:
+                if (currentStatus == PaymentStatus.PENDING)
+                {
+                    payment.Status = PaymentStatus.EXPIRED;
+                }
+                else
+                {
+                    return;
+                }
+                break;
+
+            case PaymentStatus.PAID:
+                if (currentStatus == PaymentStatus.PENDING || currentStatus == PaymentStatus.PENDING)
+                {
+                    payment.Status = PaymentStatus.PAID;
+                    payment.PaidAt = DateTime.UtcNow;
+                    await _rabbitPublisher.PublishPaymentApproved(payment);
+                }
+                else
+                {
+                    throw new InvalidOperationException($"Não é possível aprovar um pagamento em status: {currentStatus}");
+                }
+                break;
+
+            default:
+                throw new ArgumentException($"Ação de status '{request.Action}' não permitida.");
+        }
+
+        payment.PaymentHistory.Add(new Domains.PaymentStory
+        {
+            Status = payment.Status.ToString(),
+            Description = $"O pagamento {request.TxId} foi pago.",
+            Timestamp = DateTime.UtcNow
+        });
+        await _dbContext.SaveChangesAsync();
+    }
 }

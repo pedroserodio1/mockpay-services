@@ -1,8 +1,8 @@
 services:
   gateway:
-    build: ./gateway-nginx 
+    build: ./gateway-nginx
     container_name: mockpay_gateway
-    ports: 
+    ports:
       - "8080:80"
     depends_on:
       - account-service
@@ -15,17 +15,35 @@ services:
       - account-db
     environment:
       - MONGO_URL=mongodb://${MONGO_USER}:${MONGO_PASS}@account-db:27017/account_db?authSource=admin
-      - JWT_SECRET=${JWT_SECRET} 
-      - PORT=8081 
+      - JWT_SECRET=${JWT_SECRET}
+      - PORT=8081
   payment-service:
     build:
-      context: ./payment-service/PaymentService 
+      context: ./payment-service/PaymentService
     container_name: mockpay_payment_service
     depends_on:
-      - payment-db 
+      - payment-db
+      - rabbit-mq
     environment:
       - ConnectionStrings__DefaultConnection=Host=payment-db;Port=5432;Database=payment_db;Username=${POSTGRES_USER};Password=${POSTGRES_PASS}
       - ASPNETCORE_URLS=http://+:8082
+      - RABBITMQ_USER=${RABBIT_USER}
+      - RABBITMQ_PASS=${RABBIT_PASS}
+      - RABBITMQ_HOST=rabbit-mq
+
+  rabbit-mq:
+    build:
+      context: ./rabbitmq-custom
+    container_name: mockpay_rabbit
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBIT_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBIT_PASS}
+    volumes:
+      - rabbit-mq-data:/var/lib/rabbitmq/
+    restart: unless-stopped
   account-db:
     image: mongo:6.0
     container_name: mockpay-account-db
@@ -54,7 +72,7 @@ services:
       ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_USER}
       ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_PASS}
       ME_CONFIG_MONGODB_ENABLE_ADMIN: "true"
-  
+
   payment-db:
     image: postgres:15-alpine
     container_name: mockpay_payment_db
@@ -72,4 +90,6 @@ volumes:
   account-db-data:
     driver: local
   payment-db-data:
+    driver: local
+  rabbit-mq-data:
     driver: local
